@@ -1,3 +1,5 @@
+#include "easy3d/render.hpp"
+#include "easy3d/utils.hpp"
 #include "main.hpp"
 #include "sengi/sengi.hpp"
 
@@ -18,6 +20,7 @@
 #include <vector>
 
 using namespace manifold;
+using namespace easy3d;
 
 std::map<std::shared_ptr<sengi::Node>, std::shared_ptr<Manifold>> node_map;
 
@@ -27,7 +30,13 @@ std::vector<std::shared_ptr<Manifold>> models;
 MeshGL sceneMesh;
 // Scene dirty flag: set to true when models vector changes
 bool sceneDirty = false;
-void update_view(MeshGL &mesh);
+
+// Plane display toggles
+bool show_xy_plane = true;
+bool show_yz_plane = false;
+bool show_xz_plane = false;
+
+// Draw grid/fill for XY/YZ/XZ planes (implemented in render.cpp)
 
 // Combine all models and upload to OpenGL
 void update_scene_mesh()
@@ -40,52 +49,28 @@ void update_scene_mesh()
         combined += *models[i];
     }
     sceneMesh = combined.GetMeshGL();
-    update_view(sceneMesh);
-}
-
-// Project a 3D point to 2D screen coordinates
-bool projectToScreen(const float obj[3], int &x, int &y, int width,
-                     int height)
-{
-    GLdouble model[16], proj[16];
-    GLint view[4];
-    glGetDoublev(GL_MODELVIEW_MATRIX, model);
-    glGetDoublev(GL_PROJECTION_MATRIX, proj);
-    glGetIntegerv(GL_VIEWPORT, view);
-    GLdouble winX, winY, winZ;
-    if (!gluProject(obj[0], obj[1], obj[2], model, proj, view, &winX, &winY,
-                    &winZ))
-        return false;
-    x = static_cast<int>(winX);
-    y = height - static_cast<int>(winY); // OpenGL origin is bottom-left
-    return true;
+    render::update_view(sceneMesh);
 }
 
 // Callback type for mesh click: receives model index
 using MeshClickCallback = std::function<void(int modelIndex)>;
 
 // Check if any mesh in models was clicked, given mouse position and camera
-void check_sphere_click(int mouseX, int mouseY, int winW, int winH,
-                        const MeshClickCallback &cb)
+void check_node_click(int mouseX, int mouseY, int winW, int winH,
+                      const MeshClickCallback &cb)
 {
     constexpr float radius = 8.0f; // pixels, match glPointSize
     for (size_t mi = 0; mi < models.size(); ++mi)
     {
         const auto &m = models[mi];
         auto mesh = m->GetMeshGL();
-        // Use vertPos if available, else vertProperties
+        // Use the interleaved vertProperties (first 3 values are x,y,z).
         const float *verts = nullptr;
         size_t nVerts = 0;
-
-        if (!mesh.vertProperties.empty())
-        {
-            verts = reinterpret_cast<const float *>(mesh.vertProperties.data());
-            nVerts = mesh.vertProperties.size() / 3;
-        }
-        else if (!mesh.vertProperties.empty())
+        if (!mesh.vertProperties.empty() && mesh.numProp >= 3)
         {
             verts = mesh.vertProperties.data();
-            nVerts = mesh.vertProperties.size() / 3;
+            nVerts = mesh.vertProperties.size() / mesh.numProp;
         }
         for (size_t vi = 0; vi < nVerts; ++vi)
         {
@@ -121,29 +106,7 @@ void check_sphere_click(int mouseX, int mouseY, int winW, int winH,
     }
 }
 
-// Simple camera struct for navigation
-struct Camera
-{
-    float distance = 100.0f;
-    float azimuth = 0.0f;   // horizontal angle (radians)
-    float elevation = 0.0f; // vertical angle (radians)
-    float panX = 0.0f, panY = 0.0f;
-};
-
-// Helper: set up a basic modelview matrix (no shaders, fixed pipeline)
-void setCamera(const Camera &cam)
-{
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    // Camera position in spherical coordinates
-    float x = cam.distance * cosf(cam.elevation) * sinf(cam.azimuth);
-    float y = cam.distance * sinf(cam.elevation);
-    float z = cam.distance * cosf(cam.elevation) * cosf(cam.azimuth);
-    gluLookAt(x + cam.panX, y + cam.panY, z, cam.panX, cam.panY, 0.0f, 0.0f, 1.0f,
-              0.0f);
-}
-
-GLuint vao, vbo, ebo;
+// VAO/VBO/EBO now managed by render.cpp
 
 Manifold RoundedFrame(double edgeLength, double radius, int circularSegments)
 {
@@ -166,26 +129,7 @@ Manifold RoundedFrame(double edgeLength, double radius, int circularSegments)
     return frame;
 }
 
-void update_view(MeshGL &mesh)
-{
-    // Upload mesh data to OpenGL (positions only)
-
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glGenBuffers(1, &ebo);
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * mesh.vertProperties.size(),
-                 mesh.vertProperties.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void *)0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.triVerts.size() * sizeof(GLuint),
-                 mesh.triVerts.data(), GL_STATIC_DRAW);
-}
+// rendering functions moved to src/render.{hpp,cpp}
 
 void handle_events(SDL_Event &event, bool &leftDown, bool &rightDown,
                    int &lastX, int &lastY, Camera &cam, bool &wireframe,
@@ -198,7 +142,7 @@ int main(int /*argc*/, char ** /*argv*/)
     std::cout << "HELLO\n";
 
     SDL_Init(SDL_INIT_VIDEO);
-    int winW = 800, winH = 600;
+    int winW = 1024, winH = 768;
     SDL_Window *window = SDL_CreateWindow(
         "Manifold + SDL2 + OpenGL", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, winW, winH, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
@@ -227,7 +171,7 @@ int main(int /*argc*/, char ** /*argv*/)
     update_scene_mesh();
 
     // Example callback for sphere click
-    auto on_sphere_click = [](int axis)
+    auto on_shape_click = [](int axis)
     {
         if (axis == 0)
             std::cout << "X axis sphere clicked!\n";
@@ -245,7 +189,7 @@ int main(int /*argc*/, char ** /*argv*/)
     bool wireframe = false;
     bool running = true;
     // For deferred sphere click check
-    bool pendingSphereClick = false;
+    bool pendingShapeClick = false;
     int clickX = 0, clickY = 0;
 
     while (running)
@@ -264,7 +208,7 @@ int main(int /*argc*/, char ** /*argv*/)
             {
                 clickX = event.button.x;
                 clickY = event.button.y;
-                pendingSphereClick = true;
+                pendingShapeClick = true;
                 std::cout << "Stored click at " << clickX << ", " << clickY << "\n";
             }
             handle_events(event, leftDown, rightDown, lastX, lastY, cam, wireframe,
@@ -284,18 +228,19 @@ int main(int /*argc*/, char ** /*argv*/)
         setCamera(cam);
 
         // Now matrices are correct, check for sphere click
-        if (pendingSphereClick)
+        if (pendingShapeClick)
         {
-            check_sphere_click(clickX, clickY, winW, winH, on_sphere_click);
-            pendingSphereClick = false;
+            check_node_click(clickX, clickY, winW, winH, on_shape_click);
+            pendingShapeClick = false;
         }
 
-        draw_plane_lines();
+        render::draw_plane_lines();
+
+        // Draw optional grid/planes
+        render::draw_planes_grid(show_xy_plane, show_yz_plane, show_xz_plane);
 
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, sceneMesh.triVerts.size() * 3, GL_UNSIGNED_INT,
-                       0);
+        render::draw_scene(sceneMesh);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // reset for UI overlays if any
 
         // Start the ImGui frame
@@ -323,9 +268,7 @@ int main(int /*argc*/, char ** /*argv*/)
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
-    glDeleteBuffers(1, &ebo);
+    render::destroy();
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -338,6 +281,13 @@ void draw_help(Camera &cam)
     // Show navigation help window
     ImGui::Begin("Navigation Help");
     ImGui::Text("3D Navigation Controls:");
+    ImGui::Separator();
+    // Plane toggles
+    ImGui::Checkbox("Show XY Plane", &show_xy_plane);
+    ImGui::SameLine();
+    ImGui::Checkbox("Show YZ Plane", &show_yz_plane);
+    ImGui::SameLine();
+    ImGui::Checkbox("Show XZ Plane", &show_xz_plane);
     ImGui::Separator();
     ImGui::BulletText("Left Mouse Drag: Orbit");
     ImGui::BulletText("Right Mouse Drag: Pan");
@@ -564,6 +514,9 @@ void init_ui(SDL_Window *window, SDL_GLContext glContext)
     glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
+    // Background: medium gray to better see shapes
+    glClearColor(0.20f, 0.20f, 0.20f, 1.0f);
+
     // Main directional light (white, from above/front/right)
     GLfloat light0_pos[] = {0.7f, 1.0f, 1.0f, 0.0f};
     GLfloat light0_ambient[] = {0.25f, 0.25f, 0.25f, 1.0f};
@@ -592,34 +545,4 @@ void init_ui(SDL_Window *window, SDL_GLContext glContext)
     gluPerspective(45.0, 800.0 / 600.0, 0.1, 1000.0);
 }
 
-void draw_plane_lines()
-{
-    // Draw 3D axes (arrows) at the origin
-    glDisable(GL_LIGHTING);
-    glLineWidth(3.0f);
-    glBegin(GL_LINES);
-    // X axis (red)
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(30.0f, 0.0f, 0.0f);
-    // Y axis (green)
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 30.0f, 0.0f);
-    // Z axis (blue)
-    glColor3f(0.0f, 0.0f, 1.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 30.0f);
-    glEnd();
-    // Draw arrow heads
-    glPointSize(8.0f);
-    glBegin(GL_POINTS);
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glVertex3f(30.0f, 0.0f, 0.0f);
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glVertex3f(0.0f, 30.0f, 0.0f);
-    glColor3f(0.0f, 0.0f, 1.0f);
-    glVertex3f(0.0f, 0.0f, 30.0f);
-    glEnd();
-    glEnable(GL_LIGHTING);
-}
+// rendering implementations moved to src/render.cpp

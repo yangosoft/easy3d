@@ -6,6 +6,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(BUILD_TESTING OFF CACHE BOOL "Build the tests")
+
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 include(FetchContent)
@@ -83,10 +85,17 @@ target_include_directories(sengi PRIVATE include)
 
 add_executable(
   easy3d
-  src/main.cpp
+  src/main2.cpp
+  src/render.cpp
   include/easy3d.hpp
   include/main.hpp
+  include/easy3d/utils.hpp
+  include/easy3d/render.hpp
+    
+    
+
 )
+
 
 target_include_directories(easy3d PRIVATE include ${IMGUI_INCLUDE_DIR})
 target_link_libraries(easy3d PUBLIC manifold imgui SDL2::SDL2 GLEW::GLEW OpenGL::GL OpenGL::GLU sengi )
