@@ -1,2 +1,3 @@
 # easy3d
-Very simple 3d editor for 3d printing using Manifold
+
+Very simple 3d editor for 3d printing using [Manifold] (https://github.com/elalish/manifold), OpenGL, SDL2, imgui...
