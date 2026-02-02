@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sengi/types.hpp"
+
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -12,8 +14,10 @@ namespace sengi
     class Node
     {
     public:
+        using PtrShrNode = std::shared_ptr<Node>;
+
         Node() = default;
-        Node(int id, const std::string &name) : id(id), name(name) {}
+        Node(int id, std::string_view name) : id(id), name(name) {}
 
         // Set and get name
         void set_name(std::string_view new_name);
@@ -34,20 +38,20 @@ namespace sengi
         void set_id(int new_id);
 
         // Add child node
-        void add_child(std::shared_ptr<Node> child);
+        void add_child(PtrShrNode child);
         // Remove child node
-        void remove_child(std::shared_ptr<Node> child);
+        void remove_child(PtrShrNode child);
         // Get child nodes
-        const std::vector<std::shared_ptr<Node>> &get_childs() const;
-
+        const std::vector<PtrShrNode> &get_childs() const;
         virtual ~Node() = default;
 
     private:
-        float position[3]{0.0f, 0.0f, 0.0f};
-        float rotation[4]{0.0f, 0.0f, 0.0f, 1.0f}; // Quaternion
-        float scale[3]{1.0f, 1.0f, 1.0f};
+        Vec3F position{0.0f, 0.0f, 0.0f};
+        Vec4F rotation{0.0f, 0.0f, 0.0f, 1.0f}; // Quaternion
+        Vec3F scale{1.0f, 1.0f, 1.0f};
         int id;
         std::string name;
-        std::vector<std::shared_ptr<Node>> childs;
+        std::vector<PtrShrNode> childs;
     };
+
 } // namespace sengi

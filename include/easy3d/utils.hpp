@@ -47,4 +47,38 @@ namespace easy3d
                   0.0f);
     }
 
+    void resetCamera(Camera &cam)
+    {
+        cam.distance = 100.0f;
+        cam.azimuth = 0.0f;
+        cam.elevation = 0.0f;
+        cam.panX = 0.0f;
+        cam.panY = 0.0f;
+    }
+
+    void setOrthoProjection(int width, int height)
+    {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        float aspect = static_cast<float>(width) / static_cast<float>(height);
+        if (aspect >= 1.0f)
+        {
+            glOrtho(-50.0f * aspect, 50.0f * aspect, -50.0f, 50.0f, 0.1f, 1000.0f);
+        }
+        else
+        {
+            glOrtho(-50.0f, 50.0f, -50.0f / aspect, 50.0f / aspect, 0.1f, 1000.0f);
+        }
+        glMatrixMode(GL_MODELVIEW);
+    }
+
+    void resetProjection(int width, int height)
+    {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        float aspect = static_cast<float>(width) / static_cast<float>(height);
+        gluPerspective(45.0f, aspect, 0.1f, 1000.0f);
+        glMatrixMode(GL_MODELVIEW);
+    }
+
 } // namespace easy3d

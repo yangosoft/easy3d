@@ -2,12 +2,12 @@
 
 using namespace sengi;
 
-void Scene::addNode(std::shared_ptr<Node> node)
+void Scene::addNode(SharedPtrNode node)
 {
     childs.push_back(node);
 }
 
-void Scene::removeNode(std::shared_ptr<Node> node)
+void Scene::removeNode(SharedPtrNode node)
 {
     childs.erase(std::remove(childs.begin(), childs.end(), node), childs.end());
 }
@@ -15,7 +15,7 @@ void Scene::removeNode(std::shared_ptr<Node> node)
 void Scene::removeNodeById(int id)
 {
     childs.erase(std::remove_if(childs.begin(), childs.end(),
-                                [id](const std::shared_ptr<Node> &node)
+                                [id](const SharedPtrNode &node)
                                 { return node->get_id() == id; }),
                  childs.end());
 }
@@ -28,12 +28,12 @@ void Scene::removeAllNodes()
 void Scene::removeNodeByName(std::string_view name)
 {
     childs.erase(std::remove_if(childs.begin(), childs.end(),
-                                [name](const std::shared_ptr<Node> &node)
+                                [name](const SharedPtrNode &node)
                                 { return node->get_name() == name; }),
                  childs.end());
 }
 
-const std::vector<std::shared_ptr<Node>> &Scene::getChildNodes() const
+const std::vector<SharedPtrNode> &Scene::getChildNodes() const
 {
     return childs;
 }
@@ -46,4 +46,12 @@ void Scene::setName(std::string_view scene_name)
 std::string_view Scene::getName() const
 {
     return name;
+}
+
+void Scene::applyToAllNodes(std::function<void(SharedPtrNode)> func)
+{
+    for (auto &node : childs)
+    {
+        func(node);
+    }
 }

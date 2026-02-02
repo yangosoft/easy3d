@@ -79,7 +79,9 @@ src/sengi/node.cpp
 src/sengi/scene.cpp
 include/sengi/sengi.hpp
 include/sengi/node.hpp
-include/sengi/scene.hpp)
+include/sengi/scene.hpp
+include/sengi/types.hpp
+)
 
 target_include_directories(sengi PRIVATE include)
 
@@ -91,9 +93,6 @@ add_executable(
   include/main.hpp
   include/easy3d/utils.hpp
   include/easy3d/render.hpp
-    
-    
-
 )
 
 

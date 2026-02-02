@@ -2,11 +2,13 @@
 
 #include "sengi/node.hpp"
 
+#include <functional>
 #include <memory>
 #include <vector>
 
 namespace sengi
 {
+    using SharedPtrNode = std::shared_ptr<Node>;
     class Scene
     {
     public:
@@ -19,9 +21,9 @@ namespace sengi
 
         std::string_view getName() const;
 
-        void addNode(std::shared_ptr<Node> node);
+        void addNode(SharedPtrNode node);
 
-        void removeNode(std::shared_ptr<Node> node);
+        void removeNode(SharedPtrNode node);
 
         void removeNodeById(int id);
 
@@ -29,10 +31,13 @@ namespace sengi
 
         void removeNodeByName(std::string_view name);
 
-        const std::vector<std::shared_ptr<Node>> &getChildNodes() const;
+        const std::vector<SharedPtrNode> &getChildNodes() const;
+
+        void applyToAllNodes(std::function<void(SharedPtrNode)> func);
+        
 
     private:
-        std::vector<std::shared_ptr<Node>> childs;
+        std::vector<SharedPtrNode> childs;
         std::string name;
         int id;
     };
